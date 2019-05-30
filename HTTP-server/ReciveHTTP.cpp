@@ -8,6 +8,20 @@
 #include "WorkWithURL.h"
 #include "WorkWithFileSystem.h"
 
+BOOL DotsFound(char **PathArr, int ArrLen)
+{
+	char *Tmp = NULL;
+	for (int i = 0; i < ArrLen; i++)
+	{
+		Tmp = strstr(PathArr[i], "..");
+		if (Tmp != NULL)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 void ReciveRequestAndSendResponse(SOCKET ClientSock)
 {
 	int Res, RecvRes;
@@ -20,6 +34,7 @@ void ReciveRequestAndSendResponse(SOCKET ClientSock)
 	if (Res == SOCKET_ERROR)
 	{
 		printf("select function failed with error = %d\n", WSAGetLastError());
+		free(HTTPBuff);
 		getchar();
 		return;
 	}
@@ -29,8 +44,6 @@ void ReciveRequestAndSendResponse(SOCKET ClientSock)
 
 /*define request type*/
 	TRequestType ReqType = GetRequestType(HTTPBuff);
-	char *ResponseBuff = (char*)calloc(1, sizeof(char));
-	int ResponseBuffLen = 0;
 	if (ReqType == NotImplemented)
 	{
 	/*send response with "method not implemented" code*/
@@ -41,10 +54,19 @@ void ReciveRequestAndSendResponse(SOCKET ClientSock)
 	/*parse url*/
 		int ArrLen;
 		char **PathArr = ParseURL(HTTPBuff, &ArrLen);
-	/*do anything depending on the type of request*/
-		ProcessRequest(PathArr, ArrLen, ReqType, ClientSock, HTTPBuff, RecvRes);
+		if (DotsFound(PathArr, ArrLen))
+		{
+			send(ClientSock, BAD_RESPONSE, strlen(BAD_RESPONSE), 0);
+		}
+		else
+		{
+		/*do anything depending on the type of request*/
+			ProcessRequest(PathArr, ArrLen, ReqType, ClientSock, HTTPBuff, RecvRes);
+			free(PathArr);
+		}
 	}
 			
+	free(HTTPBuff);
 	shutdown(ClientSock, SD_BOTH);
 	closesocket(ClientSock);
 	return;

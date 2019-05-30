@@ -194,11 +194,13 @@ void PutFile(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff, int Reciv
 			{
 				/*response code will be 201 created*/
 				send(Sock, CREATED_RESPONSE, strlen(CREATED_RESPONSE), 0);
+				free(Path);
 			}
 			else
 			{
 				/*response code will be 200 ok*/
 				send(Sock, OK_RESPONSE, strlen(OK_RESPONSE), 0);
+				free(Path);
 			}
 		}
 	}
@@ -214,6 +216,7 @@ void PutFile(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff, int Reciv
 			if (Result == SOCKET_ERROR)
 			{
 				printf("select function failed with error = %d\n", WSAGetLastError());
+				free(Path);
 				return;
 			}
 
@@ -233,6 +236,7 @@ void PutFile(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff, int Reciv
 		if (Res == INVALID_HANDLE_VALUE)
 		{
 			CreateDirectoryA(Path, NULL);
+			free(Path);
 			/*response code will be 201 created*/
 			send(Sock, CREATED_RESPONSE, strlen(CREATED_RESPONSE), 0);
 		}
@@ -240,6 +244,7 @@ void PutFile(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff, int Reciv
 		{
 			/*response code will be 200 ok*/
 			send(Sock, OK_RESPONSE, strlen(OK_RESPONSE), 0);
+			free(Path);
 		}
 	}
 }
@@ -263,6 +268,7 @@ void GetFile(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff)
 		strcat_s(Tmp, Len + 1, PATH_DELIMITER);
 		strcat_s(Tmp, Len + 1, "*");
 		ReadDir(Sock, Tmp);
+		free(Tmp);
 		return;
 	}
 
@@ -334,8 +340,10 @@ int DelDir(char *Path)
 			TmpPath[Len - 1] = '\0';
 			if (RemoveDirectoryA(TmpPath) == 0)
 			{
+				free(TmpPath);
 				return 0;
 			}
+			free(TmpPath);
 		}
 		else
 		{
@@ -345,8 +353,10 @@ int DelDir(char *Path)
 			ConcatPath(&TmpPath, Data.cFileName);
 			if (DeleteFileA(TmpPath) == 0)
 			{
+				free(TmpPath);
 				return 0;
 			}
+			free(TmpPath);
 		}
 	}
 	FindClose(search_file);
