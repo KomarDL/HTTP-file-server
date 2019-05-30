@@ -68,7 +68,7 @@ void ReciveFile(char Path[], SOCKET Sock, char HTTPBuff[], int ReciveRes)
 
 	WriteInFile(Out, Tmp, ReciveRes);
 
-	timeval Delay = { 5, 0 };
+	timeval Delay = { 1, 0 };
 	fd_set ForRead = { 1, Sock };
 	int RecvRes = 0;
 

@@ -4,6 +4,7 @@
 #include <WinSock2.h>
 #include <fileapi.h>
 #include "HTTPResponse.h"
+#include "WorkWithURL.h"
 
 void CreateRoot()
 {
@@ -106,6 +107,62 @@ void FileRead(SOCKET Sock, char Path[], char *HTTPBuff)
 	fclose(In);
 }
 
+void FileCopy(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff)
+{
+	char *Tmp = strstr(HTTPBuff, COPY_REQUEST);
+	int DestLen;
+	char **DestPathArr = ParseURL(Tmp, &DestLen);
+	if (ThisIsFile(DestPathArr[DestLen - 1]) && ThisIsFile(PathArr[ArrLen - 1]))
+	{
+		int Len = strlen(PATH_FOR_SERVER_ROOT);
+		char *Path = (char*)calloc(Len + 1, sizeof(char));
+		memcpy_s(Path, Len + 1, PATH_FOR_SERVER_ROOT, Len);
+		CreateDir(PathArr, ArrLen, &Path);
+		ConcatPath(&Path, PathArr[ArrLen - 1]);
+
+		int LenDest = strlen(PATH_FOR_SERVER_ROOT);
+		char *PathDest = (char*)calloc(LenDest + 1, sizeof(char));
+		memcpy_s(PathDest, Len + 1, PATH_FOR_SERVER_ROOT, Len);
+		CreateDir(DestPathArr, DestLen, &PathDest);
+		ConcatPath(&PathDest, DestPathArr[DestLen - 1]);
+
+		if (strcmp(Path, PathDest) == 0)
+		{
+			send(Sock, BAD_RESPONSE, strlen(BAD_RESPONSE), 0);
+			return;
+		}
+
+		HANDLE ResDest, Res;
+		WIN32_FIND_DATAA DataDest, Data;
+
+		 ResDest = FindFirstFileA(Path, &Data);
+		 Res = FindFirstFileA(PathDest, &DataDest);
+
+		if (Res == INVALID_HANDLE_VALUE)
+		{
+			send(Sock, NOT_FOUND_RESPONSE, strlen(NOT_FOUND_RESPONSE), 0);
+			return;
+		}
+		else
+		{
+			if (CopyFileA(PathDest, Path, FALSE) != 0)
+			{
+				send(Sock, OK_RESPONSE, strlen(OK_RESPONSE), 0);
+				return;
+			}
+			else
+			{
+				send(Sock, INTERNAL_ERROR_RESPONSE, strlen(INTERNAL_ERROR_RESPONSE), 0);
+				return;
+			}
+		}
+	}
+	else
+	{
+		send(Sock, NOT_FOUND_RESPONSE, strlen(NOT_FOUND_RESPONSE), 0);
+	}
+}
+
 void PutFile(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff, int ReciveRes)
 {
 	if (ArrLen == 0)
@@ -127,7 +184,8 @@ void PutFile(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff, int Reciv
 	{
 		if (strstr(HTTPBuff, COPY_REQUEST) != NULL) 
 		{
-		
+			FileCopy(PathArr, ArrLen, Sock, HTTPBuff);
+
 		}
 		else
 		{
@@ -146,6 +204,32 @@ void PutFile(char *PathArr[], int ArrLen, SOCKET Sock, char *HTTPBuff, int Reciv
 	}
 	else
 	{
+		timeval Delay = { 1, 0 };
+		fd_set ForRead = { 1, Sock };
+		int RecvRes = 0;
+		int Result;
+		do
+		{
+			Result = select(0, &ForRead, NULL, NULL, &Delay);
+			if (Result == SOCKET_ERROR)
+			{
+				printf("select function failed with error = %d\n", WSAGetLastError());
+				return;
+			}
+
+			if (Result > 0)
+			{
+				RecvRes = recv(Sock, HTTPBuff, HTTP_BUFFER_SIZE, 0);
+				if (RecvRes == SOCKET_ERROR)
+				{
+					printf("recv function failed with error = %d\n", WSAGetLastError());
+					return;
+				}
+				ForRead.fd_count = 1;
+				ForRead.fd_array[0] = Sock;
+			}
+		} while (RecvRes != 0 && Result != 0);
+
 		if (Res == INVALID_HANDLE_VALUE)
 		{
 			CreateDirectoryA(Path, NULL);
